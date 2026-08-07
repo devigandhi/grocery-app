@@ -1,0 +1,187 @@
+generator client {
+  provider     = "prisma-client"
+  output       = "../generated/prisma"
+  moduleFormat = "cjs"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String
+  phoneNumber   String    @unique
+  email         String?   @unique
+  emailVerified Boolean   @default(false)
+  image         String?
+  role          Role      @default(USER)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  sessions        Session[]
+  accounts        Account[]
+  shoppingLists   ShoppingList[]
+  sharesSent      ShoppingListShare[] @relation("SharedBy")
+  sharesReceived  ShoppingListShare[] @relation("SharedWith")
+
+  @@map("user")
+}
+
+enum Role {
+  ADMIN
+  USER
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  ipAddress String?
+  userAgent String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("session")
+}
+
+model Account {
+  id                    String    @id @default(cuid())
+  userId                String
+  accountId             String
+  providerId            String
+  password              String?
+  accessToken           String?
+  refreshToken          String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  idToken               String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("account")
+}
+
+model Verification {
+  id         String   @id @default(cuid())
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@map("verification")
+}
+
+model Shop {
+  id        String   @id @default(cuid())
+  name      String
+  location  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  shoppingListItems ShoppingListItem[]
+
+  @@map("shop")
+}
+
+model Grocery {
+  id        String   @id @default(cuid())
+  item      String
+  category  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  shoppingListItems ShoppingListItem[]
+
+  @@index([category])
+  @@map("grocery")
+}
+
+model ShoppingList {
+  id        String   @id @default(cuid())
+  name      String   @default("My Shopping List")
+  ownerId   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  owner  User                  @relation(fields: [ownerId], references: [id])
+  items  ShoppingListItem[]
+  shares ShoppingListShare[]
+
+  @@index([ownerId])
+  @@map("shopping_list")
+}
+
+model ShoppingListItem {
+  id             String   @id @default(cuid())
+  shoppingListId String
+  groceryId      String
+  quantity       Decimal  @default(1)
+  unit           Unit
+  shopId         String?
+  isChecked      Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  shoppingList ShoppingList @relation(fields: [shoppingListId], references: [id], onDelete: Cascade)
+  grocery      Grocery      @relation(fields: [groceryId], references: [id])
+  shop         Shop?        @relation(fields: [shopId], references: [id])
+
+  @@index([shoppingListId])
+  @@map("shopping_list_item")
+}
+
+enum Unit {
+  PCS
+  KG
+  G
+  L
+  ML
+  PACK
+  DOZEN
+}
+
+model ShoppingListShare {
+  id               String       @id @default(cuid())
+  shoppingListId   String
+  sharedByUserId   String
+  sharedWithUserId String
+  channel          ShareChannel
+  sharedAt         DateTime     @default(now())
+
+  shoppingList   ShoppingList          @relation(fields: [shoppingListId], references: [id], onDelete: Cascade)
+  sharedBy       User                  @relation("SharedBy", fields: [sharedByUserId], references: [id])
+  sharedWith     User                  @relation("SharedWith", fields: [sharedWithUserId], references: [id])
+  items          ShoppingListShareItem[]
+
+  @@index([sharedWithUserId])
+  @@index([shoppingListId])
+  @@map("shopping_list_share")
+}
+
+// Frozen snapshot of the list's items at the moment this share was sent.
+// Keeps each recipient's copy stable even if the sender later edits their live list.
+model ShoppingListShareItem {
+  id                  String   @id @default(cuid())
+  shoppingListShareId String
+  groceryName         String   // denormalized: item name at time of share
+  category            String   // denormalized: category at time of share
+  quantity            Decimal
+  unit                Unit
+  shopName            String?  // denormalized: shop name at time of share, if any
+
+  shoppingListShare ShoppingListShare @relation(fields: [shoppingListShareId], references: [id], onDelete: Cascade)
+
+  @@index([shoppingListShareId])
+  @@map("shopping_list_share_item")
+}
+
+enum ShareChannel {
+  WHATSAPP
+  EMAIL
+}

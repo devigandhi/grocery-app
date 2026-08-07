@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(tree:*)",
+      "Bash(node -e \"console.log\\(require\\('fs'\\).readFileSync\\('generated/prisma/client.ts','utf8'\\).slice\\(0,2000\\)\\)\")",
+      "WebFetch(domain:www.better-auth.com)",
+      "Bash(node -e ' *)",
+      "Bash(bun add *)"
+    ]
+  }
+}
